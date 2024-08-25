@@ -6,11 +6,11 @@ from threading import Thread
 from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
  
-API_ID = os.environ.get("API_ID","xxxxx")
-API_HASH = os.environ.get("API_HASH","xxxxxxxxxx")
-BOT_TOKEN = os.environ.get("BOT_TOKEN","xxxxxxxxxxxxxxxx")
-DATABASE_URL = os.environ.get("DATABASE_URL","xxxxxxxxxxxxxxxxx")
-BOT_USERNAME = os.environ.get("BOT_USERNAME","xxxxxxxxx") # Without @
+API_ID = os.environ.get("API_ID","9301087")
+API_HASH = os.environ.get("API_HASH","cbabdb3f23de6326352ef3ac26338d9c")
+BOT_TOKEN = os.environ.get("BOT_TOKEN","7012084014:AAHitJcIDaelpb-9NyU7D_PGkL3u1qnvZeo")
+DATABASE_URL = os.environ.get("DATABASE_URL","mongodb://xaepm11:xaepm11@<hostname>/?ssl=true&replicaSet=atlas-fofi2o-shard-0&authSource=admin&retryWrites=true&w=majority&appName=Cluster0")
+BOT_USERNAME = os.environ.get("BOT_USERNAME","Auto_Deleter_1Bot") # Without @
 
 #database
 client = AsyncIOMotorClient(DATABASE_URL)
