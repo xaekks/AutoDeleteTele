@@ -9,7 +9,7 @@ import asyncio
 API_ID = os.environ.get("API_ID","9301087")
 API_HASH = os.environ.get("API_HASH","cbabdb3f23de6326352ef3ac26338d9c")
 BOT_TOKEN = os.environ.get("BOT_TOKEN","7012084014:AAHitJcIDaelpb-9NyU7D_PGkL3u1qnvZeo")
-DATABASE_URL = os.environ.get("DATABASE_URL","mongodb+srv://heroku02:heroku02@cluster0.1o1gniu.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+DATABASE_URL = os.environ.get("DATABASE_URL","mongodb+srv://bob:bobfiles1@bob.sp1vv.mongodb.net/?retryWrites=true&w=majority&appName=bob")
 BOT_USERNAME = os.environ.get("BOT_USERNAME","Auto_Deleter_1Bot") # Without @
 
 #database
