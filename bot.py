@@ -1,125 +1,187 @@
 import os
+import asyncio
+import logging
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from flask import Flask, redirect
 from threading import Thread
 from motor.motor_asyncio import AsyncIOMotorClient
-import asyncio
- 
+
+# --- CONFIG ---
 API_ID = os.environ.get("API_ID","9301087")
 API_HASH = os.environ.get("API_HASH","cbabdb3f23de6326352ef3ac26338d9c")
 BOT_TOKEN = os.environ.get("BOT_TOKEN","7879064100:AAFRr4wHNLZaN-LN4E5JYeTi-Qtgc0q1HSc")
 DATABASE_URL = os.environ.get("DATABASE_URL","mongodb+srv://bob:bobfiles1@bob.sp1vv.mongodb.net/?retryWrites=true&w=majority&appName=bob")
 BOT_USERNAME = os.environ.get("BOT_USERNAME","autoo_deletee_bot") # Without @
+FORCE_SUB_CHANNEL = "kissuxbots"  # Without @
+OWNER_ID = 7771222218  # Your Telegram user ID
 
-#database
+# --- DB ---
 client = AsyncIOMotorClient(DATABASE_URL)
-db = client['databas']
+db = client['autodelete']
 groups = db['group_id']
 
+# --- BOT ---
+bot = Client("autodeletebot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-bot = Client(
-    "deletebot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
-    workers=300,
-    sleep_threshold=10
-)
+# --- LOGGING ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- LANGUAGE SYSTEM ---
+LANG = {
+    "en": {
+        "start": "**I'm an auto-delete bot. Add me to a group and set a delete time!**",
+        "set_time_usage": "Send like this: `/set_time 10` (in seconds)",
+        "set_success": "✅ Auto-delete set to {time}s!",
+        "admin_only": "❌ Only group admins can use this.",
+        "number_only": "❌ Time must be a number.",
+        "private_only": "❌ Use this command only in groups.",
+        "no_permission": "⚠️ I need 'Delete Messages' permission!",
+        "settings_title": "🔧 Group Settings",
+        "disable_success": "🛑 Auto-delete disabled in this group.",
+        "status": "✅ Bot is active and running!",
+        "force_sub": "🚫 All group admins must join [@{channel}](https://t.me/{channel}) to use me.",
+        "total_groups": "📊 Total groups using bot: **{count}**"
+    },
+    "hi": {
+        "start": "**मैं एक ऑटो-डिलीट बोट हूं, मुझे ग्रुप में जोड़ें और समय सेट करें!**",
+        "set_time_usage": "ऐसे भेजें: `/set_time 10` (सेकंड में)",
+        "set_success": "✅ डिलीट समय {time} सेकंड सेट कर दिया गया!",
+        "admin_only": "❌ केवल ग्रुप एडमिन्स ही इसका उपयोग कर सकते हैं।",
+        "number_only": "❌ समय केवल संख्या में होना चाहिए।",
+        "private_only": "❌ यह कमांड केवल ग्रुप में उपयोग करें।",
+        "no_permission": "⚠️ मुझे 'Delete Messages' की अनुमति दें!",
+        "settings_title": "🔧 ग्रुप सेटिंग्स",
+        "disable_success": "🛑 इस ग्रुप में ऑटो-डिलीट बंद कर दिया गया।",
+        "status": "✅ बोट सक्रिय है!",
+        "force_sub": "🚫 सभी एडमिन्स को [@{channel}](https://t.me/{channel}) में शामिल होना आवश्यक है।",
+        "total_groups": "📊 बोट का उपयोग करने वाले ग्रुप्स की कुल संख्या: **{count}**"
+    }
+}
+
+def tr(lang, key, **kwargs):
+    return LANG.get(lang, LANG["en"])[key].format(**kwargs)
+
+def get_lang(user):
+    return "hi" if user.language_code == "hi" else "en"
+
+# --- HANDLERS ---
 
 @bot.on_message(filters.command("start") & filters.private)
-async def start(_, message):
-    button = [[
-        InlineKeyboardButton("🎈 Aᴅᴅ ʏᴏᴜʀ Gʀᴏᴜᴘ 🎈", url=f"http://t.me/{BOT_USERNAME}?startgroup=none&admin=delete_messages"),
-        ]]
-    await message.reply_text(
-        f"**I ᴀᴍ Aᴜᴛᴏ Dᴇʟᴇᴛᴇ Bᴏᴛ, I ᴄᴀɴ ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ɢʀᴏᴜᴘs ᴍᴇssᴀɢᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ᴀғᴛᴇʀ ᴀ ᴄᴇʀᴛᴀɪɴ ᴘᴇʀɪᴏᴅ ᴏғ ᴛɪᴍᴇ.**",
-        reply_markup=InlineKeyboardMarkup(button),
-        parse_mode=enums.ParseMode.MARKDOWN
-    )
-    
+async def start_handler(_, msg):
+    lang = get_lang(msg.from_user)
+    btn = [[InlineKeyboardButton("➕ Add to Group", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")]]
+    await msg.reply(tr(lang, "start"), reply_markup=InlineKeyboardMarkup(btn))
+
 @bot.on_message(filters.command("set_time"))
-async def set_delete_time(_, message):
+async def set_time(_, msg):
+    lang = get_lang(msg.from_user)
 
-    # Check if the message is from a private chat
-    if message.chat.type in [enums.ChatType.PRIVATE]:
-        await message.reply("**Tʜɪs ᴄᴏᴍᴍᴀɴᴅ ᴄᴀɴ ᴏɴʟʏ ʙᴇ ᴜsᴇᴅ ɪɴ ɢʀᴏᴜᴘs....😒**")
-        return
-    
-    # Extract group_id and delete_time from the message
-    if len(message.text.split()) == 1:
-        await message.reply_text("**Dᴇʟᴇᴛᴇ ᴛɪᴍᴇ ᴍᴜsᴛ ʙᴇ ᴀɴ ɴᴜᴍʙᴇʀ...\n\nExᴀᴍᴘʟᴇ : /sᴇᴛ_ᴛɪᴍᴇ 10\nExᴀᴍᴘʟᴇ : /sᴇᴛ_ᴛɪᴍᴇ 20\nExᴀᴍᴘʟᴇ : /sᴇᴛ_ᴛɪᴍᴇ 30\n\nOɴʟʏ Sᴇᴄᴏᴜɴᴅ 🙌**")
-        return
+    if msg.chat.type == enums.ChatType.PRIVATE:
+        return await msg.reply(tr(lang, "private_only"))
 
-    delete_time = message.text.split()[1]
-    if not delete_time.isdigit():
-        await message.reply_text("**Dᴇʟᴇᴛᴇ ᴛɪᴍᴇ ᴍᴜsᴛ ʙᴇ ᴀɴ ɴᴜᴍʙᴇʀ...\n\nExᴀᴍᴘʟᴇ : /sᴇᴛ_ᴛɪᴍᴇ 10\nExᴀᴍᴘʟᴇ : /sᴇᴛ_ᴛɪᴍᴇ 20\nExᴀᴍᴘʟᴇ : /sᴇᴛ_ᴛɪᴍᴇ 30\n\nOɴʟʏ Sᴇᴄᴏᴜɴᴅ 🙌**")
-        return
-    
-    chat_id = message.chat.id
-    user_id = message.from_user.id
+    if len(msg.command) < 2 or not msg.command[1].isdigit():
+        return await msg.reply(tr(lang, "number_only") + "\n\n" + tr(lang, "set_time_usage"))
 
-    # Check if the user is the group owner or an admin
-    administrators = []
-    async for m in bot.get_chat_members(chat_id, filter=enums.ChatMembersFilter.ADMINISTRATORS):
-        administrators.append(m.user.id)
+    delete_time = int(msg.command[1])
+    admins = [m.user.id async for m in bot.get_chat_members(msg.chat.id, filter=enums.ChatMembersFilter.ADMINISTRATORS)]
 
-    if user_id not in administrators:
-        await message.reply("**Oɴʟʏ ɢʀᴏᴜᴘ ᴀᴅᴍɪɴs ᴄᴀɴ ᴅᴏ ᴛʜɪs....😘**")
-        return
-    
-    # Save to the database
-    await groups.update_one(
-        {"group_id": chat_id},
-        {"$set": {"delete_time": delete_time}},
-        upsert=True
-    )
-    try:
-        await message.reply_text(f"**Sᴜᴄᴄᴇssғᴜʟʟʏ Sᴇᴛ {delete_time} Sᴇᴄᴏᴜɴᴅ....✅**")
-    except Exception as e:
-        await message.reply_text(f"Erorr: {e}")
-         
+    if msg.from_user.id not in admins:
+        return await msg.reply(tr(lang, "admin_only"))
+
+    # Force Subscribe for Admins
+    for admin_id in admins:
+        try:
+            member = await bot.get_chat_member(f"@{FORCE_SUB_CHANNEL}", admin_id)
+            if member.status == enums.ChatMemberStatus.BANNED:
+                raise Exception("Banned")
+        except:
+            return await msg.reply(tr(lang, "force_sub", channel=FORCE_SUB_CHANNEL), disable_web_page_preview=True)
+
+    await groups.update_one({"group_id": msg.chat.id}, {"$set": {"delete_time": delete_time, "enabled": True}}, upsert=True)
+    await msg.reply(tr(lang, "set_success", time=delete_time))
+
+@bot.on_message(filters.command("disable"))
+async def disable_handler(_, msg):
+    lang = get_lang(msg.from_user)
+    admins = [m.user.id async for m in bot.get_chat_members(msg.chat.id, filter=enums.ChatMembersFilter.ADMINISTRATORS)]
+    if msg.from_user.id not in admins:
+        return await msg.reply(tr(lang, "admin_only"))
+    await groups.update_one({"group_id": msg.chat.id}, {"$set": {"enabled": False}})
+    await msg.reply(tr(lang, "disable_success"))
+
+@bot.on_message(filters.command("status"))
+async def status_handler(_, msg):
+    lang = get_lang(msg.from_user)
+    admins = [m.user.id async for m in bot.get_chat_members(msg.chat.id, filter=enums.ChatMembersFilter.ADMINISTRATORS)]
+    if msg.from_user.id not in admins:
+        return await msg.reply(tr(lang, "admin_only"))
+    await msg.reply(tr(lang, "status"))
+
+@bot.on_message(filters.command("total_groups") & filters.user(OWNER_ID))
+async def total_groups_handler(_, msg):
+    count = await groups.count_documents({})
+    await msg.reply(tr("en", "total_groups", count=count))
+
+@bot.on_message(filters.command("settings"))
+async def settings(_, msg):
+    lang = get_lang(msg.from_user)
+    if msg.chat.type == enums.ChatType.PRIVATE:
+        return await msg.reply(tr(lang, "private_only"))
+
+    btn = [
+        [InlineKeyboardButton("🕒 Set 10s", callback_data="set_10")],
+        [InlineKeyboardButton("🛑 Disable AutoDelete", callback_data="disable")]
+    ]
+    await msg.reply(tr(lang, "settings_title"), reply_markup=InlineKeyboardMarkup(btn))
+
+@bot.on_callback_query()
+async def callback_handler(_, cb):
+    data = cb.data
+    msg = cb.message
+    lang = get_lang(cb.from_user)
+
+    admins = [m.user.id async for m in bot.get_chat_members(msg.chat.id, filter=enums.ChatMembersFilter.ADMINISTRATORS)]
+    if cb.from_user.id not in admins:
+        return await cb.answer("Admins only.", show_alert=True)
+
+    if data.startswith("set_"):
+        sec = int(data.split("_")[1])
+        await groups.update_one({"group_id": msg.chat.id}, {"$set": {"delete_time": sec, "enabled": True}}, upsert=True)
+        await cb.answer(tr(lang, "set_success", time=sec), show_alert=True)
+
+    elif data == "disable":
+        await groups.update_one({"group_id": msg.chat.id}, {"$set": {"enabled": False}})
+        await cb.answer(tr(lang, "disable_success"), show_alert=True)
+
 @bot.on_message(filters.group & filters.text)
-async def delete_message(_, message):
-    chat_id = message.chat.id
-    user_id = message.from_user.id
-    is_bot = message.from_user.is_bot
-
-    # Check if the user is the group owner or an admin
-    administrators = []
-    async for m in bot.get_chat_members(chat_id, filter=enums.ChatMembersFilter.ADMINISTRATORS):
-        administrators.append(m.user.id)
-
-    # If the user is an admin or a bot with admin permissions, don't delete the message
-    if user_id in administrators and not is_bot:
+async def auto_delete(_, msg):
+    group = await groups.find_one({"group_id": msg.chat.id})
+    if not group or not group.get("enabled"):
         return
 
-    # Check if the group has a delete time set
-    group = await groups.find_one({"group_id": chat_id})
-    if not group:
-        return
-
-    delete_time = int(group["delete_time"])
+    delete_time = int(group.get("delete_time", 10))
 
     try:
-        # Delete the message
         await asyncio.sleep(delete_time)
-        await message.delete()
+        await msg.delete()
     except Exception as e:
-        print(f"An error occurred: {e}/nGroup ID: {chat_id}")    
+        if "can't" in str(e) or "rights" in str(e):
+            await msg.reply(tr(get_lang(msg.from_user), "no_permission"))
+        logger.warning(f"Delete failed in {msg.chat.id}: {e}")
 
-
-# Flask configuration
+# --- WEB SERVER ---
 app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return redirect(f"https://telegram.me/{BOT_USERNAME}", code=302)
+    return redirect(f"https://t.me/{BOT_USERNAME}", code=302)
 
 def run():
-    app.run(host="0.0.0.0", port=int(os.environ.get('PORT', 8080)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
+# --- MAIN ---
 if __name__ == "__main__":
-    t = Thread(target=run)
-    t.start()
-    bot.run()    
+    Thread(target=run).start()
+    bot.run()
